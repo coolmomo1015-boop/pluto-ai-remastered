@@ -114,7 +114,8 @@ jobs:
             throw 'PowerShell launcher script contains syntax errors.'
           }
           & 'out/scripts/start-pluto-v2.ps1' -PackageCheck
-          if ($LASTEXITCODE -ne 0) { throw 'Packaged path validation failed.' }
+          $packageCheckSucceeded = $?
+          if (-not $packageCheckSucceeded) { throw 'Packaged path validation failed.' }
 
       - name: Upload probe artifact
         uses: actions/upload-artifact@v4
