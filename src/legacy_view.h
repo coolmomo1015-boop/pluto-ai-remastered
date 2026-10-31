@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <string>
 #include "commands.h"
+#include "command_rate_limiter.h"
 
 // Compatibility view for the pinned Pluto binary's direct 1.16.1 memory reads.
 // The bot writes only to this view; commands are collected for SCR translation.
@@ -35,7 +36,8 @@ private:
   int frame_number=0;
   std::string flush_error;
   unsigned sent=0;
-  struct PendingTurn {int frame;std::vector<Packet> packets;};
+  struct PendingTurn {int frame;std::vector<Packet> packets;size_t next_packet=0;};
+  CommandRateLimiter command_rate_limiter;
   std::vector<PendingTurn> pending_turns;
   uint32_t address(uint32_t old) const;
   uint32_t unit(uint32_t raw) const;
