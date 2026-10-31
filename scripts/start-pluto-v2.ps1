@@ -6,7 +6,8 @@ param(
   [switch]$DrawGraph,
   [switch]$Multiplayer,
   [switch]$Challenge,
-  [switch]$VerifyOnly
+  [switch]$VerifyOnly,
+  [switch]$PackageCheck
 )
 
 $ErrorActionPreference = 'Stop'
@@ -29,14 +30,34 @@ if ([string]::IsNullOrWhiteSpace($StarCraft)) {
   if ([string]::IsNullOrWhiteSpace($programFilesX86)) {
     throw 'Cannot locate Program Files (x86). Pass -StarCraft with the full StarCraft.exe path.'
   }
-  $StarCraft = Join-Path $programFilesX86 'StarCraft\\x86\\StarCraft.exe'
+  $StarCraft = Join-Path $programFilesX86 'StarCraft\x86\StarCraft.exe'
 }
 if ([string]::IsNullOrWhiteSpace($Pluto)) {
-  $Pluto = Join-Path $projectRoot 'model-v2\\pluto.dll'
+  $Pluto = Join-Path $projectRoot 'model-v2\pluto.dll'
 }
 
 $bin = Join-Path $projectRoot 'bin'
 $runtime = Join-Path $projectRoot $(if ($Challenge) { 'runtime-v2-challenge' } elseif ($Multiplayer) { 'runtime-v2-multiplayer' } else { 'runtime-v2' })
+if ($PackageCheck) {
+  $modelDirectory = Join-Path (Split-Path -Path $Pluto -Parent) 'pluto'
+  $requiredPaths = @(
+    $Pluto,
+    (Join-Path $modelDirectory 'pluto_infer.exe'),
+    (Join-Path $modelDirectory 'pluto_weights.bin'),
+    (Join-Path $bin 'pluto-scr.dll'),
+    (Join-Path $bin 'scr-loader.exe')
+  )
+  foreach ($requiredPath in $requiredPaths) {
+    if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf)) {
+      throw "Package is missing required file: $requiredPath"
+    }
+  }
+  Write-Output "Package paths resolved successfully from: $projectRoot"
+  Write-Output "Pluto model: $Pluto"
+  Write-Output "Bridge binaries: $bin"
+  return
+}
+
 function Assert-Hash([string]$Path, [string]$Expected) {
   if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "Missing file: $Path" }
   # Use the built-in .NET implementation, including on Windows PowerShell 5.1
