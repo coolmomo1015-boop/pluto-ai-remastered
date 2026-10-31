@@ -95,7 +95,7 @@ void load_bot() {
   BWAPI::BroodwarPtr=api_game.get();
   api_game->onMatchStart();
   if(!bot_module) {
-    if(file_sha256(bot_path)!=pluto_sha256)throw std::runtime_error("Unsupported Pluto DLL SHA-256; expected CoG 2026 release");
+    if(file_sha256(bot_path)!=pluto_sha256)throw std::runtime_error("Unsupported Pluto DLL SHA-256; expected Pluto v2.0 md09b_1331000 release");
     bot_module=LoadLibraryExW(bot_path,nullptr,LOAD_WITH_ALTERED_SEARCH_PATH);
     if(!bot_module)throw std::runtime_error("Cannot load configured Pluto DLL");
     legacy=std::make_unique<LegacyView>();legacy->update();legacy->bind(bot_module);
