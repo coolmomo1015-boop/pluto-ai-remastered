@@ -1,6 +1,6 @@
 # Pluto v2.0 Remastered porting plan
 
-Status: research branch only. This is not a working v2.0 bridge yet.
+Status: experimental v2.0 x86 build completed in GitHub Actions. The v2.0 binding generator found all required legacy ABI sentinels, the Win32 bridge compiled, and CTest passed. This is not yet a validated gameplay release; live Battle.net custom-room tests remain required.
 
 ## Goals
 - Preserve the existing CoG 2026 Battle.net custom-game bridge.
@@ -17,7 +17,7 @@ Status: research branch only. This is not a working v2.0 bridge yet.
 - Current Remastered adapter contains hard-coded relocation expectations generated from the CoG 2026 DLL, and the runtime explicitly checks the CoG 2026 DLL hash.
 - Current bridge has experimental Battle.net Melee and Challenge code for the CoG 2026 build.
 
-## Required engineering work
+## Completed in the current branch\n- Added a v2.0-specific binding generator pinned to the official DLL SHA-256.\n- First GitHub Actions Windows x86 probe completed successfully: official archive/file hashes, address binding generation, bridge compilation, CTest, and artifact packaging all passed.\n- Added a separate v2.0 launcher and model directory; the existing CoG 2026 `main` branch remains unchanged.\n- Added a transparent 400 translated-command-packets/minute rolling limiter with a 150 ms minimum spacing and unit tests. This is a gameplay rate limit, not an anti-cheat bypass.\n\n## Required engineering work
 1. Independently inspect the v2.0 PE32 image and verify its architecture, exports, sections, relocation data and every absolute-memory reference used by the bot.
 2. Determine whether the v2.0 binary still references the legacy 1.16.1 memory layout in the same way as CoG 2026.
 3. Generate a new version-specific relocation table. Do not reuse the old binding table or merely remove the hash check.
