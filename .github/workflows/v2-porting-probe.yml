@@ -1,0 +1,91 @@
+name: Pluto v2.0 Remastered x86 compatibility probe
+
+on:
+  push:
+    branches: [pluto-v2-porting]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe-and-build:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout porting branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python analysis tools
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Download and verify official Pluto v2.0 release
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $zip = Join-Path $env:RUNNER_TEMP 'pluto-v2.0.zip'
+          Invoke-WebRequest -Uri 'https://github.com/tscmoo/pluto/releases/download/v2.0/pluto-v2.0.zip' -OutFile $zip
+          $zipHash = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLowerInvariant()
+          if ($zipHash -ne '17544fc3ab32e3e2823646887e021cf998362348d73740817e94d1a78aa6209d') {
+            throw "Unexpected Pluto v2.0 archive hash: $zipHash"
+          }
+          $upstream = Join-Path $env:RUNNER_TEMP 'pluto-v2.0'
+          Expand-Archive -LiteralPath $zip -DestinationPath $upstream -Force
+          $dll = Get-ChildItem -Path $upstream -Filter pluto.dll -Recurse | Select-Object -First 1
+          $infer = Get-ChildItem -Path $upstream -Filter pluto_infer.exe -Recurse | Select-Object -First 1
+          $weights = Get-ChildItem -Path $upstream -Filter pluto_weights.bin -Recurse | Select-Object -First 1
+          if (-not $dll -or -not $infer -or -not $weights) { throw 'The official v2.0 archive is missing required files.' }
+          $expected = @{
+            'pluto.dll' = '603fea2f77a4b652f29b832c2977cf5bc9d83bbcb927febd04499220020ce3bc'
+            'pluto_infer.exe' = '3f2814a51034b9817b396e52b38d30341ede506a2baedc7cbc11cb6ebcece2cc'
+            'pluto_weights.bin' = 'c53a559b4910777dc0e1c561c0d89d243091f465d8e9fc0f5f72e56597067d86'
+          }
+          foreach ($file in @($dll,$infer,$weights)) {
+            $actual = (Get-FileHash -Algorithm SHA256 $file.FullName).Hash.ToLowerInvariant()
+            if ($actual -ne $expected[$file.Name]) { throw "Hash mismatch: $($file.Name) $actual" }
+          }
+          "V2_DLL=$($dll.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "V2_INFER=$($infer.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "V2_WEIGHTS=$($weights.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Generate v2.0 relocation table
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check pefile capstone
+          python scripts/generate_pluto_v2_bindings.py "$env:V2_DLL" "src/pluto_bindings.h"
+
+      - name: Configure Win32 build
+        shell: pwsh
+        run: cmake -S . -B build -A Win32
+
+      - name: Build x86 bridge and tests
+        shell: pwsh
+        run: |
+          cmake --build build --config Release --parallel
+          if ($LASTEXITCODE -ne 0) { throw 'Win32 bridge build failed.' }
+          ctest --test-dir build -C Release --output-on-failure
+          if ($LASTEXITCODE -ne 0) { throw 'Bridge tests failed.' }
+
+      - name: Package probe output
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path out -Force | Out-Null
+          Copy-Item 'build/Release/pluto-scr.dll' 'out/'
+          Copy-Item 'build/Release/scr-loader.exe' 'out/'
+          Copy-Item 'src/pluto_bindings.h' 'out/'
+          Copy-Item 'scripts/generate_pluto_v2_bindings.py' 'out/'
+          @(
+            'Pluto v2.0 x86 bridge compatibility probe',
+            'This is a compile/probe artifact, not a validated gameplay release.',
+            'Live Remastered Battle.net Melee and Top vs Bottom tests remain required.',
+            'The official Pluto v2.0 model files are not redistributed in this artifact.'
+          ) | Set-Content 'out/STATUS.txt'
+      
+      - name: Upload probe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pluto-v2-remastered-x86-probe
+          path: out/
+          if-no-files-found: error
+          retention-days: 14
