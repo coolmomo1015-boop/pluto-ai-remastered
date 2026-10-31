@@ -5,6 +5,10 @@ on:
     branches: [pluto-v2-porting]
   workflow_dispatch:
 
+concurrency:
+  group: pluto-v2-porting-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
