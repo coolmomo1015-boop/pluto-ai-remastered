@@ -1,5 +1,18 @@
 # Pluto for StarCraft: Remastered
 
+## Pluto v2.0 experimental Battle.net port
+
+The `pluto-v2-porting` branch adds a separate experimental Pluto v2.0 integration for the existing StarCraft: Remastered 1.23.10.13515 x86 bridge. It targets the official `md09b_1331000` 342M int8 model and preserves the existing experimental Battle.net custom-room modes.
+
+- Launchers: `Start Pluto V2 Multiplayer.cmd` for custom-room Melee and `Start Pluto V2 Challenge.cmd` for experimental Top vs Bottom / 1-v-many.
+- Model files are stored separately under `model-v2/`; the original CoG 2026 paths and `main` branch remain untouched.
+- The bridge limits translated command packets to 400 in any rolling 60-second window, paced at a minimum 150 ms interval. This is an approximate gameplay action limit, not a promise that the in-game APM counter will display exactly 400.
+- GitHub Actions verified the official v2.0 archive and file hashes, generated the v2 binding table, compiled the Win32 bridge, passed CTest, and packaged an artifact.
+- **Still experimental:** successful compilation does not prove live Battle.net compatibility. Melee synchronization and Top vs Bottom gameplay must be tested in public custom rooms before relying on this build. It is not for ranked ladder use and does not include anti-cheat evasion.
+
+See [PORTING_PLUTO_V2.md](PORTING_PLUTO_V2.md) for technical details and remaining validation.
+
+
 비공식 호환 프로젝트입니다. Pluto의 공개 CoG 2026 바이너리를 설치된 StarCraft: Remastered **1.23.10.13515 x86**에서 실행하는 Windows 호환 브리지입니다. 원본 모델을 사용한 오프라인 실전 결과와 리플레이는 [검증 기록](validation/RESULTS.md)에 요약합니다. 개인 경기 로그·리플레이·스크린샷과 게임·모델 원본은 공개 저장소에 포함하지 않습니다.
 
 **2026-09-30 멀티플레이 개발판:** 공개 커스텀 방에서 사람과 Pluto가 1대1로 대결하기 위한 실행 옵션을 추가했습니다. 사용자가 진행한 밀리 공개방 3경기의 실행 로그와 리플레이를 확인했습니다. 이후 봇이 시작하지 않은 경기는 유즈맵·FFA·Top vs Bottom 설정으로 확인됐습니다. [진단 기록](validation/SESSION-DIAGNOSIS-20260930.md)을 참고하세요.
