@@ -74,9 +74,9 @@ jobs:
       - name: Package probe output
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path out -Force | Out-Null
-          Copy-Item 'build/Release/pluto-scr.dll' 'out/'
-          Copy-Item 'build/Release/scr-loader.exe' 'out/'
+          New-Item -ItemType Directory -Path 'out/bin' -Force | Out-Null
+          Copy-Item 'build/Release/pluto-scr.dll' 'out/bin/'
+          Copy-Item 'build/Release/scr-loader.exe' 'out/bin/'
           Copy-Item 'src/pluto_bindings.h' 'out/'
           Copy-Item 'scripts/generate_pluto_v2_bindings.py' 'out/'
           New-Item -ItemType Directory -Path 'out/scripts' -Force | Out-Null
