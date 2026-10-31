@@ -75,11 +75,22 @@ jobs:
           Copy-Item 'build/Release/scr-loader.exe' 'out/'
           Copy-Item 'src/pluto_bindings.h' 'out/'
           Copy-Item 'scripts/generate_pluto_v2_bindings.py' 'out/'
+          Copy-Item 'scripts/start-pluto-v2.ps1' 'out/'
+          Copy-Item 'Start Pluto V2.cmd' 'out/'
+          Copy-Item 'Start Pluto V2 Multiplayer.cmd' 'out/'
+          Copy-Item 'Start Pluto V2 Challenge.cmd' 'out/'
+          New-Item -ItemType Directory -Path 'out/model-v2/pluto' -Force | Out-Null
+          Copy-Item $env:V2_DLL 'out/model-v2/pluto.dll'
+          Copy-Item $env:V2_INFER 'out/model-v2/pluto/pluto_infer.exe'
+          Copy-Item $env:V2_WEIGHTS 'out/model-v2/pluto/pluto_weights.bin'
           @(
-            'Pluto v2.0 x86 bridge compatibility probe',
-            'This is a compile/probe artifact, not a validated gameplay release.',
-            'Live Remastered Battle.net Melee and Top vs Bottom tests remain required.',
-            'The official Pluto v2.0 model files are not redistributed in this artifact.'
+            'Pluto v2.0 Remastered x86 experimental bridge',
+            'Official v2.0 model files are included and were SHA-256 verified in CI.',
+            'The Win32 bridge compiled and the automated CTest suite passed.',
+            'The command queue has a transparent rolling 400-packet-per-minute limiter.',
+            'This is not yet a validated gameplay release.',
+            'Test Battle.net custom Melee and Top vs Bottom rooms before relying on it.',
+            'Do not use in ranked ladder or to bypass anti-cheat systems.'
           ) | Set-Content 'out/STATUS.txt'
       
       - name: Upload probe artifact
