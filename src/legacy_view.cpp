@@ -33,9 +33,9 @@ void LegacyView::begin_frame(FILE* log,int frame) {
     if(!command_rate_limiter.allow(now))break;
     const auto& packet=turn->packets[turn->next_packet++];
     send(packet.data(),packet.size());++sent;
-    std::fprintf(log,"{\\"command_frame\\":%d,\\"queued_frame\\":%d,\\"packet_hex\\":\\"",frame,turn->frame);
+    std::fprintf(log,"{\"command_frame\":%d,\"queued_frame\":%d,\"packet_hex\":\"",frame,turn->frame);
     for(auto b:packet)std::fprintf(log,"%02x",b);
-    std::fprintf(log,"\\",\\"submitted\\":true,\\"apm_window\\":%u}\\n",
+    std::fprintf(log,"\",\"submitted\":true,\"apm_window\":%u}\n",
       command_rate_limiter.used_in_window());
     if(turn->next_packet>=turn->packets.size())pending_turns.erase(turn);
     break;
