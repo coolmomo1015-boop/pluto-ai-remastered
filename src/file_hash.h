@@ -29,4 +29,4 @@ inline std::string file_sha256(const std::filesystem::path& path) {
   return result;
 }
 inline constexpr char scr_sha256[]="32dbbdd001dd381cb1b3a719b7ad1fc918a9d4bc99661c675e00254efecca827";
-inline constexpr char pluto_sha256[]="7e360b643c8c0156c03fe0cad9972a3058138ccfe22f921c5b4e0cd0aaf0abef";
+inline constexpr char pluto_sha256[]="603fea2f77a4b652f29b832c2977cf5bc9d83bbcb927febd04499220020ce3bc";
