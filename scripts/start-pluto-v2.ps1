@@ -1,15 +1,40 @@
 [CmdletBinding()]
 param(
-  [string]$StarCraft = (Join-Path ${env:ProgramFiles(x86)} 'StarCraft\x86\StarCraft.exe'),
-  [string]$Pluto = (Join-Path (Split-Path $PSScriptRoot -Parent) 'model-v2\pluto.dll'),
+  [string]$StarCraft = '',
+  [string]$Pluto = '',
   [ValidateRange(-1,1000)][int]$SpeedMs = 0,
   [switch]$DrawGraph,
   [switch]$Multiplayer,
   [switch]$Challenge,
   [switch]$VerifyOnly
 )
+
 $ErrorActionPreference = 'Stop'
-$projectRoot = Split-Path $PSScriptRoot -Parent
+
+# Resolve paths only after the script has started. $PSScriptRoot is not reliable
+# in a param() default expression, which caused Split-Path to receive an empty
+# string when launched from the packaged .cmd files.
+$scriptPath = $PSCommandPath
+if ([string]::IsNullOrWhiteSpace($scriptPath)) {
+  $scriptPath = $MyInvocation.MyCommand.Path
+}
+if ([string]::IsNullOrWhiteSpace($scriptPath)) {
+  throw 'Cannot determine the path of start-pluto-v2.ps1.'
+}
+$scriptDirectory = [System.IO.Path]::GetDirectoryName([System.IO.Path]::GetFullPath($scriptPath))
+$projectRoot = Split-Path -Path $scriptDirectory -Parent
+
+if ([string]::IsNullOrWhiteSpace($StarCraft)) {
+  $programFilesX86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
+  if ([string]::IsNullOrWhiteSpace($programFilesX86)) {
+    throw 'Cannot locate Program Files (x86). Pass -StarCraft with the full StarCraft.exe path.'
+  }
+  $StarCraft = Join-Path $programFilesX86 'StarCraft\\x86\\StarCraft.exe'
+}
+if ([string]::IsNullOrWhiteSpace($Pluto)) {
+  $Pluto = Join-Path $projectRoot 'model-v2\\pluto.dll'
+}
+
 $bin = Join-Path $projectRoot 'bin'
 $runtime = Join-Path $projectRoot $(if ($Challenge) { 'runtime-v2-challenge' } elseif ($Multiplayer) { 'runtime-v2-multiplayer' } else { 'runtime-v2' })
 function Assert-Hash([string]$Path, [string]$Expected) {
