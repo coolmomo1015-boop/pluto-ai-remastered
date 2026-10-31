@@ -79,7 +79,8 @@ jobs:
           Copy-Item 'build/Release/scr-loader.exe' 'out/'
           Copy-Item 'src/pluto_bindings.h' 'out/'
           Copy-Item 'scripts/generate_pluto_v2_bindings.py' 'out/'
-          Copy-Item 'scripts/start-pluto-v2.ps1' 'out/'
+          New-Item -ItemType Directory -Path 'out/scripts' -Force | Out-Null
+          Copy-Item 'scripts/start-pluto-v2.ps1' 'out/scripts/'
           Copy-Item 'Start Pluto V2.cmd' 'out/'
           Copy-Item 'Start Pluto V2 Multiplayer.cmd' 'out/'
           Copy-Item 'Start Pluto V2 Challenge.cmd' 'out/'
