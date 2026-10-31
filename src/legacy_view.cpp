@@ -16,19 +16,29 @@ LegacyView::LegacyView():memory(last-first){}
 void LegacyView::reset() {
   std::fill(memory.begin(),memory.end(),uint8_t{0});slots={};sprites={};lookup.clear();
   raw_start=raw_length=0;flush_error.clear();sent=0;pending_turns.clear();
+  command_rate_limiter.reset();
 }
 void LegacyView::begin_frame(FILE* log,int frame) {
   current_view=this;frame_log=log;frame_number=frame;sent=0;
   const auto send=reinterpret_cast<void (__cdecl*)(const uint8_t*,size_t)>(scr::send_command());
   for(auto turn=pending_turns.begin();turn!=pending_turns.end();) {
-    if(turn->frame>=frame){++turn;continue;}
-    for(const auto& packet:turn->packets) {
-      send(packet.data(),packet.size());++sent;
-      std::fprintf(log,"{\"command_frame\":%d,\"queued_frame\":%d,\"packet_hex\":\"",frame,turn->frame);
-      for(auto b:packet)std::fprintf(log,"%02x",b);
-      std::fprintf(log,"\",\"submitted\":true}\n");
+    if(turn->frame>=frame)break;
+    if(turn->next_packet>=turn->packets.size()) {
+      turn=pending_turns.erase(turn);
+      continue;
     }
-    turn=pending_turns.erase(turn);
+    // A transparent gameplay limiter: at most 400 translated command packets
+    // in any rolling 60-second window, paced by a 150 ms minimum interval.
+    const auto now=GetTickCount64();
+    if(!command_rate_limiter.allow(now))break;
+    const auto& packet=turn->packets[turn->next_packet++];
+    send(packet.data(),packet.size());++sent;
+    std::fprintf(log,"{\\"command_frame\\":%d,\\"queued_frame\\":%d,\\"packet_hex\\":\\"",frame,turn->frame);
+    for(auto b:packet)std::fprintf(log,"%02x",b);
+    std::fprintf(log,"\\",\\"submitted\\":true,\\"apm_window\\":%u}\\n",
+      command_rate_limiter.used_in_window());
+    if(turn->next_packet>=turn->packets.size())pending_turns.erase(turn);
+    break;
   }
 }
 void __cdecl LegacyView::flush_turn() noexcept {
@@ -165,7 +175,7 @@ unsigned LegacyView::drain(FILE*,int frame) {
     // SCR's offline turn queue applies commands one frame earlier than Pluto's
     // 1.16.1 training environment. Retain one frame to preserve the measured
     // four-frame observation-to-effect delay, including selection ordering.
-    pending_turns.push_back({frame,std::move(packets)});
+    pending_turns.push_back({frame,std::move(packets),0});
   }
   put<uint32_t>(address(0x654aa0),0);
   return sent;
