@@ -13,11 +13,18 @@ inline unsigned command_packet_priority(const Packet& packet) {
   // Economy, construction, unit production, morphing and technology.
   switch(opcode) {
     case 0x0c: // Placebox / building placement
+    case 0x18: // Cancel construction
+    case 0x19: // Cancel morph
     case 0x1e: // Return cargo
     case 0x1f: // Train unit
+    case 0x20: // Cancel train
     case 0x23: // Morph unit
+    case 0x27: // Build fighter
     case 0x30: // Research
+    case 0x31: // Cancel research
     case 0x32: // Upgrade
+    case 0x33: // Cancel upgrade
+    case 0x34: // Cancel addon
     case 0x35: // Zerg building morph
       return 4;
     case 0x61: // Action packet (translated from legacy 0x15)
