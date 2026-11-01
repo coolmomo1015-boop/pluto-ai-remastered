@@ -11,7 +11,7 @@ The `pluto-v2-porting` branch adds a separate experimental Pluto v2.0 integratio
 Run the v2 PowerShell launcher directly with `-APM 300`, `-APM 500`, `-APM 1000`, or `-APM 0` (unlimited). The three v2 `.cmd` launchers present the same four-choice menu. The default is 500.
 - Pending command turns are capped at 64. Unstarted stale orders expire (5 seconds for tactical intent, 8 seconds for general orders, 12 seconds for economy/production), identical queued tactical intents are coalesced, and a started selection/action sequence is kept intact.
 - Building, training, morphing, researching, upgrading, return-cargo, and resource-target right-click commands receive elevated priority. Resource-target priority is determined from the target unit type (mineral field, geyser, refinery), not guessed from opaque action-packet bytes. Older tactical orders gain at most one tier; they cannot tie or overtake economy, building or production commands.
-- GitHub Actions verified the official v2.0 archive and file hashes, generated the v2 binding table, compiled the Win32 bridge, passed CTest, and packaged an artifact.
+- The earlier v2 compatibility probe verified official model hashes and passed a Windows x86 build. The latest selectable-APM and queue-priority changes still need a fresh Windows CI run before a new ZIP is distributed.
 - **Still experimental:** successful compilation does not prove live Battle.net compatibility. Melee synchronization and Top vs Bottom gameplay must be tested in public custom rooms before relying on this build. It is not for ranked ladder use and does not include anti-cheat evasion.
 
 See [PORTING_PLUTO_V2.md](PORTING_PLUTO_V2.md) for technical details and remaining validation.
