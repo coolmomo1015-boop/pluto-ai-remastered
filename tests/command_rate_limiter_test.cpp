@@ -10,7 +10,7 @@ int main() {
     assert(limiter.used_in_window() == 2);
   }
   {
-    CommandRateLimiter limiter;
+    CommandRateLimiter limiter(400);
     for (unsigned i = 0; i < 400; ++i) {
       assert(limiter.allow(static_cast<uint64_t>(i) * 150));
     }
@@ -18,6 +18,19 @@ int main() {
     assert(!limiter.allow(59999));
     assert(limiter.allow(60000));
     assert(limiter.used_in_window() == 400);
+  }
+  {
+    CommandRateLimiter limiter(120);
+    assert(limiter.allow(0));
+    assert(!limiter.allow(499));
+    assert(limiter.allow(500));
+    assert(limiter.limit() == 120);
+  }
+  {
+    CommandRateLimiter limiter(0);
+    for (unsigned i = 0; i < 1000; ++i) assert(limiter.allow(1000));
+    assert(limiter.used_in_window() == 1000);
+    assert(limiter.limit() == 0);
   }
   {
     CommandRateLimiter limiter;
