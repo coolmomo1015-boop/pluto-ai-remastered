@@ -1,12 +1,12 @@
 # Pluto v2.0 Remastered porting plan
 
-Status: experimental v2.0 x86 build completed in GitHub Actions. The v2.0 binding generator found all required legacy ABI sentinels, the Win32 bridge compiled, and CTest passed. This is not yet a validated gameplay release; live Battle.net custom-room tests remain required.
+Status: experimental v2.0 port. The existing compatibility probe previously built in GitHub Actions, but the current APM/queue changes still require a fresh Windows build and a live game test. This is not yet a validated gameplay release.
 
 ## Goals
 - Preserve the existing CoG 2026 Battle.net custom-game bridge.
 - Evaluate a separate v2.0 profile for the same StarCraft: Remastered 1.23.10.13515 x86 target.
 - Keep Melee and the existing experimental Top vs Bottom Challenge behavior.
-- Add a transparent 400-command/minute limiter for custom-game testing only.
+- Add selectable 300 / 500 / 1000 / unlimited translated-command packet rates for custom-game testing only.
 - Do not implement anti-cheat evasion or concealment. All tests must be in explicitly labelled custom games.
 
 ## Verified upstream facts
@@ -17,14 +17,16 @@ Status: experimental v2.0 x86 build completed in GitHub Actions. The v2.0 bindin
 - Current Remastered adapter contains hard-coded relocation expectations generated from the CoG 2026 DLL, and the runtime explicitly checks the CoG 2026 DLL hash.
 - Current bridge has experimental Battle.net Melee and Challenge code for the CoG 2026 build.
 
-## Completed in the current branch\n- Added a v2.0-specific binding generator pinned to the official DLL SHA-256.\n- First GitHub Actions Windows x86 probe completed successfully: official archive/file hashes, address binding generation, bridge compilation, CTest, and artifact packaging all passed.\n- Added a separate v2.0 launcher and model directory; the existing CoG 2026 `main` branch remains unchanged.\n- Added a transparent 400 translated-command-packets/minute rolling limiter with a 150 ms minimum spacing and unit tests. This is a gameplay rate limit, not an anti-cheat bypass.\n\n## Required engineering work
+## Completed in the current branch\n- Added a v2.0-specific binding generator pinned to the official DLL SHA-256.\n- First GitHub Actions Windows x86 probe completed successfully: official archive/file hashes, address binding generation, bridge compilation, CTest, and artifact packaging all passed.\n- Added a separate v2.0 launcher and model directory; the existing CoG 2026 `main` branch remains unchanged.\n- Added selectable 300 / 500 / 1000 / unlimited packet-rate profiles (ceil(60,000 / APM) ms spacing), plus unit tests. This limits translated packets, not the displayed in-game APM counter.
+- Added a 64-turn bounded command queue, tactical-intent deduplication, TTL expiration, priority classes for production/building/research/gather/repair, and age-based promotion to prevent tactical starvation.
+- Selection packets remain coupled to their action sequences. Long selected action batches are split into chunks of up to eight packets and reapply their selection prefix.\n\n## Required engineering work
 1. Independently inspect the v2.0 PE32 image and verify its architecture, exports, sections, relocation data and every absolute-memory reference used by the bot.
 2. Determine whether the v2.0 binary still references the legacy 1.16.1 memory layout in the same way as CoG 2026.
 3. Generate a new version-specific relocation table. Do not reuse the old binding table or merely remove the hash check.
 4. Verify runtime ABI/export compatibility: gameInit, newAIModule, callback signatures, BWAPI data structures, command queue and all shared-memory/inference IPC.
 5. Verify the 64-bit inference executable's expected launch arguments, environment variables, working directory and model/weight file hashes.
 6. Build a separate v2.0 target profile; keep existing CoG 2026 profile unchanged.
-7. Add tests for generated relocation operands, snapshot conversion, command conversion, session admission, and transparent APM limiter at 400 commands per minute.
+7. Add tests for generated relocation operands, snapshot conversion, command conversion, session admission, and selectable APM limiter at 300 / 500 / 1000 / unlimited and queue priority/expiry policies.
 8. Only then package and perform in-game Battle.net custom-room tests for Melee and Top vs Bottom.
 
 ## Important limitation
