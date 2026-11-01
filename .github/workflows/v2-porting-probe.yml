@@ -113,6 +113,13 @@ jobs:
             $parseErrors | ForEach-Object { Write-Error $_.Message }
             throw 'PowerShell launcher script contains syntax errors.'
           }
+          $launcherSource = Get-Content -LiteralPath 'out/scripts/start-pluto-v2.ps1' -Raw
+          if ($launcherSource -match '-WindowStyle\\s+Hidden') {
+            throw 'The StarCraft launcher must not start the game window hidden.'
+          }
+          if ($launcherSource -notmatch 'Get-Process -Name \\$gameProcessName') {
+            throw 'The launcher must locate the visible StarCraft process after startup.'
+          }
           & 'out/scripts/start-pluto-v2.ps1' -PackageCheck
           $packageCheckSucceeded = $?
           if (-not $packageCheckSucceeded) { throw 'Packaged path validation failed.' }
