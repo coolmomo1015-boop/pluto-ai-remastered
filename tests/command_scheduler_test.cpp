@@ -1,0 +1,33 @@
+#include "command_scheduler.h"
+#include <cassert>
+
+int main() {
+  assert(command_packet_priority(Packet{0x0c,0,0,0,0,0,0,0})==4); // Build
+  assert(command_packet_priority(Packet{0x1f,0,0})==4); // Train
+  assert(command_packet_priority(Packet{0x1e,0})==4); // Return cargo
+  assert(command_packet_priority(Packet{0x63,0})==1); // Selection
+  assert(command_packet_priority(Packet{0x60,0})==2); // Right-click/tactical
+
+  Packet gather(13,0);
+  gather[0]=0x61;
+  gather[11]=15; // BWAPI Gather
+  assert(command_packet_priority(gather)==4);
+
+  Packet repair(13,0);
+  repair[0]=0x61;
+  repair[11]=17; // BWAPI Repair
+  assert(command_packet_priority(repair)==4);
+
+  Packet attack(13,0);
+  attack[0]=0x61;
+  attack[11]=1; // BWAPI Attack_Unit
+  assert(command_packet_priority(attack)==2);
+
+  assert(command_turn_priority({Packet{0x63,0},gather})==4);
+  assert(command_turn_ttl_ms(4)==12000);
+  assert(command_turn_ttl_ms(2)==5000);
+  assert(command_turn_is_replaceable({attack}));
+  assert(!command_turn_is_replaceable({Packet{0x1f,0,0}}));
+  assert(!command_turn_is_replaceable({Packet{0x63,0},Packet{0x0c,0,0}}));
+  return 0;
+}
