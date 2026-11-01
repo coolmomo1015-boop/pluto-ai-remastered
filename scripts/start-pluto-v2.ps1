@@ -101,13 +101,17 @@ Copy-Item -LiteralPath (Join-Path $bin 'pluto-scr.dll') -Destination $runtime -F
 $previousDraw = $env:BWRL_DRAW
 $previousStraddle = $env:BWRL_STRADDLE
 $previousBudget = $env:BWRL_FRAME_BUDGET_MS
+$startedGame = $null
+$game = $null
 try {
   if ($DrawGraph) { $env:BWRL_DRAW = '1' }
   if ($Multiplayer) {
     $env:BWRL_STRADDLE = '1'
     if (-not $env:BWRL_FRAME_BUDGET_MS) { $env:BWRL_FRAME_BUDGET_MS = '10' }
   }
-  $game = Start-Process -FilePath $StarCraft -ArgumentList '-launch' -WorkingDirectory $runtime -WindowStyle Hidden -PassThru
+  # Do not hide StarCraft: a hidden launch leaves MainWindowHandle=0 and
+  # prevents the bridge loader from attaching to the interactive game.
+  $startedGame = Start-Process -FilePath $StarCraft -ArgumentList '-launch' -WorkingDirectory $runtime -PassThru
 } finally {
   $env:BWRL_DRAW = $previousDraw
   $env:BWRL_STRADDLE = $previousStraddle
@@ -115,13 +119,42 @@ try {
 }
 try {
   $ready = $false
-  for ($attempt=0; $attempt -lt 60; $attempt++) {
-    $game.Refresh()
-    if ($game.HasExited) { throw 'StarCraft exited before initialization.' }
-    if ($game.MainWindowHandle -ne 0) { $ready=$true; break }
+  $gameProcessName = [System.IO.Path]::GetFileNameWithoutExtension($StarCraft)
+  for ($attempt=0; $attempt -lt 90; $attempt++) {
+    # Battle.net may hand off from the short-lived launch process to another
+    # StarCraft.exe PID. Find the actual visible game process, not just the
+    # first PID returned by Start-Process.
+    $candidates = @(Get-Process -Name $gameProcessName -ErrorAction SilentlyContinue)
+    foreach ($candidate in $candidates) {
+      try {
+        $candidate.Refresh()
+        $candidatePath = $candidate.Path
+      } catch {
+        $candidatePath = ''
+      }
+      if ($candidatePath -and
+          [System.IO.Path]::GetFullPath($candidatePath) -ine [System.IO.Path]::GetFullPath($StarCraft)) {
+        continue
+      }
+      if ($candidate.MainWindowHandle -ne 0) {
+        $game = $candidate
+        $ready = $true
+        break
+      }
+    }
+    if ($ready) { break }
     Start-Sleep -Milliseconds 500
   }
-  if (-not $ready) { throw 'StarCraft did not create its window within 30 seconds.' }
+  if (-not $ready) {
+    $observed = @(Get-Process -Name $gameProcessName -ErrorAction SilentlyContinue |
+      ForEach-Object {
+        try { $_.Refresh(); $path = $_.Path } catch { $path = '<path unavailable>' }
+        "PID=$($_.Id), MainWindowHandle=$($_.MainWindowHandle), Path=$path"
+      })
+    $details = if ($observed.Count) { $observed -join '; ' } else { 'No StarCraft process was found.' }
+    $startedState = if ($startedGame.HasExited) { "Initial PID $($startedGame.Id) exited with code $($startedGame.ExitCode)." } else { "Initial PID $($startedGame.Id) is still running." }
+    throw "StarCraft did not create a visible game window within 45 seconds. $startedState $details"
+  }
   & (Join-Path $bin 'scr-loader.exe') $game.Id (Join-Path $runtime 'pluto-scr.dll')
   if ($LASTEXITCODE -ne 0) { throw 'Bridge loading failed.' }
   $log = Join-Path $runtime 'bridge.log'
@@ -143,8 +176,12 @@ try {
   Write-Output "Logs and persistent opening statistics: $runtime"
   Write-Output "Transparent command limiter: 400 packets/minute (approximate APM). This is a gameplay limit, not an anti-cheat bypass."
 } catch {
-  # Only this launch's process is owned by the script; never stop an unrelated game.
-  $game.Refresh()
-  if (-not $game.HasExited) { Stop-Process -Id $game.Id }
+  # The initial launch and any Battle.net handoff process belong to this launch,
+  # because the script rejects pre-existing StarCraft instances above.
+  if ($null -ne $game) {
+    try { $game.Refresh(); if (-not $game.HasExited) { Stop-Process -Id $game.Id -Force } } catch {}
+  } elseif ($null -ne $startedGame) {
+    try { $startedGame.Refresh(); if (-not $startedGame.HasExited) { Stop-Process -Id $startedGame.Id -Force } } catch {}
+  }
   throw
 }
