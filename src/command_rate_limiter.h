@@ -8,7 +8,7 @@ class CommandRateLimiter {
 public:
   static constexpr uint64_t kWindowMilliseconds = 60000;
 
-  explicit CommandRateLimiter(unsigned maximum_actions_per_minute = 400) {
+  explicit CommandRateLimiter(unsigned maximum_actions_per_minute = 500) {
     set_limit(maximum_actions_per_minute);
   }
 
