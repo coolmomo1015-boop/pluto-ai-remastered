@@ -231,9 +231,12 @@ unsigned LegacyView::drain(FILE* log,int frame) {
   if(size>512)throw std::runtime_error("Legacy command queue overflow");
   if(size){
     auto packets=translate_commands(reinterpret_cast<const uint8_t*>(address(0x654880)),size,[this](uint16_t id){return scr_handle(id);});
-    // Keep each observation's packet sequence intact, while prioritizing
-    // economic work, expiring stale intent and bounding the pending backlog.
-    enqueue_turn(frame,std::move(packets),GetTickCount64(),log);
+    // Split by selection boundaries. Each group keeps its selection with the
+    // following action sequence, while independent commands get their own
+    // priority and expiry rather than sitting behind an entire mixed frame.
+    auto groups=group_command_packets(packets);
+    const auto now=GetTickCount64();
+    for(auto& group:groups)enqueue_turn(frame,std::move(group),now,log);
   }
   put<uint32_t>(address(0x654aa0),0);
   return sent;
