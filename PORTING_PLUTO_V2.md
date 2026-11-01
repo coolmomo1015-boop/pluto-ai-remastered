@@ -35,14 +35,14 @@ The equivalent PowerShell argument is -APM 300, -APM 500, -APM 1000, or -APM 0. 
 
 ### Command priority
 
-Higher priority is assigned to building placement, unit production, morphing, research, upgrades, rally commands, gathering, returning cargo, repair, and relevant production/cancellation packets. Attack and movement intent is lower priority. Waiting commands gain priority with age, so tactical orders can eventually overtake newly arriving economy work rather than being starved indefinitely.
+Higher priority is assigned to building placement, unit production, morphing, research, upgrades, return-cargo, resource-target right-click commands, and relevant production/cancellation packets. Attack and movement intent is lower priority. Waiting commands gain priority with age, so tactical orders can eventually overtake newly arriving economy work rather than being starved indefinitely.
 
-Priority assignment is based on the translated Brood War command opcode and the action field in the translated action packet. This logic has unit tests, but its effect on real matches still needs to be evaluated with replays and bridge logs.
+Priority assignment is based on verified translated Brood War command opcodes and, for right-clicks, the actual target unit type (mineral field, geyser, or refinery). The legacy 0x15 selected-units-action packet contains opaque fields, so the bridge does not guess its BWAPI command type from those bytes. This logic has unit tests, but its effect on real matches still needs to be evaluated with replays and bridge logs.
 
 ## Tests added
 
 - APM limiter tests cover 300, 500, 1000 and Unlimited, including rolling-window boundaries.
-- Scheduler tests cover build/train/return-cargo/gather/repair/attack priorities, ageing, duplicate handling, selection grouping, and the eight-packet chunk limit.
+- Scheduler tests cover build/train/return-cargo/resource-target-gather/opaque-action priorities, ageing, duplicate handling, selection grouping, and the eight-packet chunk limit.
 - The Windows workflow builds the x86 bridge and runs CTest. The latest workflow result must be checked before distributing a new ZIP.
 
 ## Remaining validation
