@@ -28,10 +28,18 @@ int main() {
   const auto groups=group_command_packets({
     Packet{0x63,0},attack,gather,Packet{0x64,0},Packet{0x1f,0,0},Packet{0x60,0}
   });
-  assert(groups.size()==3);
+  assert(groups.size()==2);
   assert(groups[0].size()==3); // Selection plus its following orders.
-  assert(groups[1].size()==2); // Next selection plus production command.
-  assert(groups[2].size()==1); // Independent tactical command.
+  assert(groups[1].size()==3); // Next selection and all following orders.
+
+  std::vector<Packet> long_selection_group{Packet{0x63,0}};
+  for(unsigned i=0;i<15;++i)long_selection_group.push_back(attack);
+  const auto bounded_groups=group_command_packets(long_selection_group);
+  assert(bounded_groups.size()==3);
+  for(const auto& group:bounded_groups) {
+    assert(group.size()<=8);
+    assert(is_selection_packet(group.front())); // Selection reapplied for each chunk.
+  }
   assert(command_turn_ttl_ms(4)==12000);
   assert(command_turn_ttl_ms(2)==5000);
   assert(command_turn_schedule_score(2,0)==2);
