@@ -92,7 +92,8 @@ jobs:
             'Pluto v2.0 Remastered x86 experimental bridge',
             'Official v2.0 model files are included and were SHA-256 verified in CI.',
             'The Win32 bridge compiled and the automated CTest suite passed.',
-            'The command queue has a transparent rolling 400-packet-per-minute limiter.',
+            'The command limiter offers 300, 500, 1000 packets/minute or unlimited.',
+            'The pending queue is bounded, expires stale orders and prioritizes economy/production.',
             'This is not yet a validated gameplay release.',
             'Test Battle.net custom Melee and Top vs Bottom rooms before relying on it.',
             'Do not use in ranked ladder or to bypass anti-cheat systems.'
@@ -123,6 +124,10 @@ jobs:
           & 'out/scripts/start-pluto-v2.ps1' -PackageCheck
           $packageCheckSucceeded = $?
           if (-not $packageCheckSucceeded) { throw 'Packaged path validation failed.' }
+          foreach ($apm in @(300,500,1000,0)) {
+            & 'out/scripts/start-pluto-v2.ps1' -PackageCheck -APM $apm
+            if (-not $?) { throw "Packaged APM profile validation failed: $apm" }
+          }
 
       - name: Upload probe artifact
         uses: actions/upload-artifact@v4
