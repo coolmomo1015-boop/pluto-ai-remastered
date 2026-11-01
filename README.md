@@ -6,7 +6,9 @@ The `pluto-v2-porting` branch adds a separate experimental Pluto v2.0 integratio
 
 - Launchers: `Start Pluto V2 Multiplayer.cmd` for custom-room Melee and `Start Pluto V2 Challenge.cmd` for experimental Top vs Bottom / 1-v-many.
 - Model files are stored separately under `model-v2/`; the original CoG 2026 paths and `main` branch remain untouched.
-- The bridge limits translated command packets to 400 in any rolling 60-second window, paced at a minimum 150 ms interval. This is an approximate gameplay action limit, not a promise that the in-game APM counter will display exactly 400.
+- At launch, choose **300 / 500 / 1000 / Unlimited** in the APM menu. The cap is applied to translated command packets in a rolling 60-second window; it is not the same measurement as the in-game APM counter. Unlimited removes the bridge cap, but dispatch still occurs at most once per game frame.
+- Pending command turns are capped at 64. Unstarted stale orders expire (5 seconds for tactical intent, 8 seconds for general orders, 12 seconds for economy/production), identical queued tactical intents are coalesced, and a started selection/action sequence is kept intact.
+- Building, training, morphing, researching, upgrading, rallying, gathering, returning cargo and repair commands receive elevated priority. Tactical commands gain priority as they age, preventing permanent starvation.
 - GitHub Actions verified the official v2.0 archive and file hashes, generated the v2 binding table, compiled the Win32 bridge, passed CTest, and packaged an artifact.
 - **Still experimental:** successful compilation does not prove live Battle.net compatibility. Melee synchronization and Top vs Bottom gameplay must be tested in public custom rooms before relying on this build. It is not for ranked ladder use and does not include anti-cheat evasion.
 
