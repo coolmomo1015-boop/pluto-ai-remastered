@@ -11,21 +11,27 @@ int main() {
   assert(command_turn_priority({Packet{0x63,0}})==3); // Standalone selection
   assert(command_packet_priority(Packet{0x60,0})==2); // Right-click/tactical
 
-  Packet gather(13,0);
-  gather[0]=0x61;
-  gather[11]=15; // BWAPI Gather
-  assert(command_packet_priority(gather)==4);
+  Packet action_packet(13,0);
+  action_packet[0]=0x61;
+  action_packet[11]=15; // Opaque legacy action-packet field, not BWAPI command type.
+  assert(command_packet_priority(action_packet)==3);
 
-  Packet repair(13,0);
-  repair[0]=0x61;
-  repair[11]=17; // BWAPI Repair
-  assert(command_packet_priority(repair)==4);
+  assert(is_resource_target_unit_type(176));
+  assert(is_resource_target_unit_type(177));
+  assert(is_resource_target_unit_type(178));
+  assert(is_resource_target_unit_type(188));
+  assert(is_resource_target_unit_type(110));
+  assert(is_resource_target_unit_type(149));
+  assert(is_resource_target_unit_type(157));
+  assert(!is_resource_target_unit_type(0));
+  assert(!is_resource_target_unit_type(0)); // Empty / no target is not a resource.
 
-  Packet attack(13,0);
-  attack[0]=0x61;
-  attack[11]=1; // BWAPI Attack_Unit
-  assert(command_packet_priority(attack)==2);
-
+  const Packet right_click{0x60,0,0,0,0,1,0,0,0,0,0,0,0};
+  assert(command_packet_priority(right_click)==2);
+  assert(command_packet_priority(right_click,176)==4); // Mineral field -> gather.
+  assert(command_packet_priority(right_click,188)==4); // Vespene geyser -> gather.
+  assert(command_packet_priority(right_click,110)==4); // Refinery -> gather.
+  assert(command_packet_priority(action_packet)==3);
   assert(command_turn_priority({Packet{0x63,0},gather})==4);
   const auto groups=group_command_packets({
     Packet{0x63,0},attack,gather,Packet{0x64,0},Packet{0x1f,0,0},Packet{0x60,0}
