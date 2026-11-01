@@ -71,8 +71,7 @@ size_t LegacyView::next_pending_turn(uint64_t now_ms) const {
     const auto& turn=pending_turns[i];
     if(now_ms<turn.not_before_ms)continue;
     const uint64_t age=now_ms>=turn.queued_at_ms?now_ms-turn.queued_at_ms:0;
-    const unsigned ageing=static_cast<unsigned>(std::min<uint64_t>(4,age/1000));
-    const unsigned score=turn.priority+ageing;
+    const unsigned score=command_turn_schedule_score(turn.priority,age);
     if(best==pending_turns.size() || score>best_score ||
        (score==best_score && age>best_age)) {
       best=i;best_score=score;best_age=age;
