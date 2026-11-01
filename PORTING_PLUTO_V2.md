@@ -35,7 +35,7 @@ The equivalent PowerShell argument is -APM 300, -APM 500, -APM 1000, or -APM 0. 
 
 ### Command priority
 
-Higher priority is assigned to building placement, unit production, morphing, research, upgrades, return-cargo, resource-target right-click commands, and relevant production/cancellation packets. Attack and movement intent is lower priority. Ageing adds at most one tier to non-economy commands, so old tactical orders can catch up with ordinary commands but cannot overtake building, production or resource-work priority.
+Higher priority is assigned to building placement, unit production, morphing, research, upgrades, return-cargo, resource-target right-click commands, and relevant production/cancellation packets. Attack and movement intent is lower priority. Ageing adds at most one tier to tactical orders. Economy, building and production remain a strictly higher scheduling tier regardless of age.
 
 Priority assignment is based on verified translated Brood War command opcodes and, for right-clicks, the actual target unit type (mineral field, geyser, or refinery). The legacy 0x15 selected-units-action packet contains opaque fields, so the bridge does not guess its BWAPI command type from those bytes. This logic has unit tests, but its effect on real matches still needs to be evaluated with replays and bridge logs.
 
