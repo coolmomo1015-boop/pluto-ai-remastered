@@ -68,6 +68,9 @@ inline unsigned command_turn_priority(const std::vector<Packet>& packets) {
   unsigned priority=1;
   for (const auto& packet:packets)
     priority=std::max(priority,command_packet_priority(packet));
+  // A selection-only turn is a precondition for commands that may follow in
+  // the next observation, so do not leave it behind combat traffic.
+  if(priority==1)return 3;
   return priority;
 }
 
