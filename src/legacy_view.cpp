@@ -21,7 +21,7 @@ void LegacyView::reset() {
 void LegacyView::prune_pending_turns(uint64_t now_ms,FILE* log) {
   for(auto it=pending_turns.begin();it!=pending_turns.end();) {
     if(it->next_packet==0 && now_ms>=it->expires_at_ms) {
-      std::fprintf(log,"{\\"stage\\":\\"queue_expired\\",\\"frame\\":%d,\\"priority\\":%u,\\"age_ms\\":%llu}\\n",
+      std::fprintf(log,"QUEUE EXPIRED frame=%d priority=%u age_ms=%llu\n",
         it->frame,it->priority,static_cast<unsigned long long>(now_ms-it->queued_at_ms));
       it=pending_turns.erase(it);
     } else ++it;
@@ -35,7 +35,7 @@ void LegacyView::enqueue_turn(int frame,std::vector<Packet> packets,uint64_t now
   if(command_turn_is_replaceable(packets)) {
     for(auto it=pending_turns.begin();it!=pending_turns.end();) {
       if(it->next_packet==0 && it->packets==packets) {
-        std::fprintf(log,"{\\"stage\\":\\"queue_coalesced\\",\\"frame\\":%d}\\n",it->frame);
+        std::fprintf(log,"QUEUE COALESCED frame=%d\n",it->frame);
         it=pending_turns.erase(it);
       } else ++it;
     }
@@ -50,11 +50,10 @@ void LegacyView::enqueue_turn(int frame,std::vector<Packet> packets,uint64_t now
         victim=it;
     }
     if(victim==pending_turns.end() || victim->priority>priority) {
-      std::fprintf(log,"{\\"stage\\":\\"queue_rejected\\",\\"frame\\":%d,\\"priority\\":%u}\\n",frame,priority);
+      std::fprintf(log,"QUEUE REJECTED frame=%d priority=%u\n",frame,priority);
       return;
     }
-    std::fprintf(log,"{\\"stage\\":\\"queue_evicted\\",\\"frame\\":%d,\\"priority\\":%u}\\n",
-      victim->frame,victim->priority);
+    std::fprintf(log,"QUEUE EVICTED frame=%d priority=%u\n",victim->frame,victim->priority);
     pending_turns.erase(victim);
   }
 
@@ -95,10 +94,10 @@ void LegacyView::begin_frame(FILE* log,int frame) {
   const auto send=reinterpret_cast<void (__cdecl*)(const uint8_t*,size_t)>(scr::send_command());
   const auto& packet=turn.packets[turn.next_packet++];
   send(packet.data(),packet.size());++sent;
-  std::fprintf(log,"{\\"command_frame\\":%d,\\"queued_frame\\":%d,\\"priority\\":%u,\\"queue_age_ms\\":%llu,\\"packet_hex\\":\\"",
+  std::fprintf(log,"SEND frame=%d queued_frame=%d priority=%u queue_age_ms=%llu packet=",
     frame,turn.frame,turn.priority,static_cast<unsigned long long>(now-turn.queued_at_ms));
   for(auto b:packet)std::fprintf(log,"%02x",b);
-  std::fprintf(log,"\\",\\"submitted\\":true,\\"apm_window\\":%u,\\"apm_limit\\":%u}\\n",
+  std::fprintf(log," submitted=true apm_window=%u apm_limit=%u\n",
     command_rate_limiter.used_in_window(),command_rate_limiter.limit());
   if(turn.next_packet>=turn.packets.size())pending_turns.erase(pending_turns.begin());
 }
