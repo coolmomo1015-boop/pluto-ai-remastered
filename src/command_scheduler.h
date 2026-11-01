@@ -115,7 +115,11 @@ inline unsigned command_turn_priority(const std::vector<Packet>& packets) {
 }
 
 inline unsigned command_turn_schedule_score(unsigned priority,uint64_t age_ms) {
-  const unsigned ageing=static_cast<unsigned>(std::min<uint64_t>(4,age_ms/1000));
+  // Economy/production priority is a hard tier: an old tactical order must
+  // never outrank a new build/train/gather/return-cargo command.
+  if(priority>=4)return priority;
+  const uint64_t ageing_interval_ms=priority<=2?4000:7000;
+  const unsigned ageing=static_cast<unsigned>(std::min<uint64_t>(1,age_ms/ageing_interval_ms));
   return priority+ageing;
 }
 
