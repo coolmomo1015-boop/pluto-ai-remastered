@@ -1,40 +1,59 @@
-# Pluto v2.0 Remastered porting plan
+# Pluto v2.0 Remastered porting notes
 
-Status: experimental v2.0 port. The existing compatibility probe previously built in GitHub Actions, but the current APM/queue changes still require a fresh Windows build and a live game test. This is not yet a validated gameplay release.
+Status: experimental. The earlier Windows x86 compatibility probe built successfully, but the latest selectable-APM and command-queue changes still need a fresh Windows CI build and live in-game testing. A successful build will not by itself prove Battle.net synchronization or good playing strength.
 
-## Goals
-- Preserve the existing CoG 2026 Battle.net custom-game bridge.
-- Evaluate a separate v2.0 profile for the same StarCraft: Remastered 1.23.10.13515 x86 target.
-- Keep Melee and the existing experimental Top vs Bottom Challenge behavior.
-- Add selectable 300 / 500 / 1000 / unlimited translated-command packet rates for custom-game testing only.
-- Do not implement anti-cheat evasion or concealment. All tests must be in explicitly labelled custom games.
+## Scope
 
-## Verified upstream facts
-- The currently supported bridge pins Pluto CoG 2026 by SHA-256:
-  7e360b643c8c0156c03fe0cad9972a3058138ccfe22f921c5b4e0cd0aaf0abef
-- The v2.0 release is md09b_1331000, 342M int8, and ships a new 32-bit BWAPI 4.4.0 DLL, 64-bit inference executable and weights.
-- v2.0 requires Brood War 1.16.1 + BWAPI 4.4.0 in its upstream supported configuration. Remastered compatibility is not claimed upstream.
-- Current Remastered adapter contains hard-coded relocation expectations generated from the CoG 2026 DLL, and the runtime explicitly checks the CoG 2026 DLL hash.
-- Current bridge has experimental Battle.net Melee and Challenge code for the CoG 2026 build.
+- Keep the existing CoG 2026 branch and files unchanged.
+- Use the official Pluto v2.0 md09b_1331000 binary and its separately generated binding table.
+- Keep the existing StarCraft: Remastered 1.23.10.13515 x86 target and experimental custom-room launch modes.
+- Do not add anti-cheat evasion or ranked-ladder support. Tests are for explicitly labelled custom games.
 
-## Completed in the current branch\n- Added a v2.0-specific binding generator pinned to the official DLL SHA-256.\n- First GitHub Actions Windows x86 probe completed successfully: official archive/file hashes, address binding generation, bridge compilation, CTest, and artifact packaging all passed.\n- Added a separate v2.0 launcher and model directory; the existing CoG 2026 `main` branch remains unchanged.\n- Added selectable 300 / 500 / 1000 / unlimited packet-rate profiles (ceil(60,000 / APM) ms spacing), plus unit tests. This limits translated packets, not the displayed in-game APM counter.
-- Added a 64-turn bounded command queue, tactical-intent deduplication, TTL expiration, priority classes for production/building/research/gather/repair, and age-based promotion to prevent tactical starvation.
-- Selection packets remain coupled to their action sequences. Long selected action batches are split into chunks of up to eight packets and reapply their selection prefix.\n\n## Required engineering work
-1. Independently inspect the v2.0 PE32 image and verify its architecture, exports, sections, relocation data and every absolute-memory reference used by the bot.
-2. Determine whether the v2.0 binary still references the legacy 1.16.1 memory layout in the same way as CoG 2026.
-3. Generate a new version-specific relocation table. Do not reuse the old binding table or merely remove the hash check.
-4. Verify runtime ABI/export compatibility: gameInit, newAIModule, callback signatures, BWAPI data structures, command queue and all shared-memory/inference IPC.
-5. Verify the 64-bit inference executable's expected launch arguments, environment variables, working directory and model/weight file hashes.
-6. Build a separate v2.0 target profile; keep existing CoG 2026 profile unchanged.
-7. Add tests for generated relocation operands, snapshot conversion, command conversion, session admission, and selectable APM limiter at 300 / 500 / 1000 / unlimited and queue priority/expiry policies.
-8. Only then package and perform in-game Battle.net custom-room tests for Melee and Top vs Bottom.
+## Implemented on pluto-v2-porting
 
-## Important limitation
-A build that compiles is not proof of runtime compatibility. The release remains experimental until a live Remastered custom game succeeds without memory validation errors, model startup errors or multiplayer synchronization failures.
+### Selectable command-rate ceiling
 
-## Exact official v2.0 artifact hashes
-- pluto.dll: 603fea2f77a4b652f29b832c2977cf5bc9d83bbcb927febd04499220020ce3bc
-- pluto/pluto_infer.exe: 3f2814a51034b9817b396e52b38d30341ede506a2baedc7cbc11cb6ebcece2cc
-- pluto/pluto_weights.bin: c53a559b4910777dc0e1c561c0d89d243091f465d8e9fc0f5f72e56597067d86
+The v2 launchers now show four choices:
 
-Official release: https://github.com/tscmoo/pluto/releases/tag/v2.0
+| Menu | Bridge packet ceiling | Minimum spacing |
+|---|---:|---:|
+| 300 | 300 packets/minute | 200 ms |
+| 500 | 500 packets/minute | 120 ms |
+| 1000 | 1000 packets/minute | 60 ms |
+| Unlimited | No rolling-window cap | No bridge-imposed spacing |
+
+The equivalent PowerShell argument is -APM 300, -APM 500, -APM 1000, or -APM 0. The default is 500. These limits count translated game-command packets; they are not the same metric as the in-game APM display. Even in Unlimited mode, the bridge sends at most one queued packet per game frame.
+
+### Bounded command queue
+
+- At most 64 pending command groups are retained.
+- Unstarted tactical commands expire after 5 seconds, general commands after 8 seconds, and economy/production commands after 12 seconds.
+- Exact duplicate tactical/selection groups that have not begun dispatch are coalesced. Build, training, morph, research, upgrade and cancellation commands are not coalesced as duplicates.
+- When the queue is full, the oldest unstarted group with the lowest base priority is evicted; a new lower-priority group is rejected when all candidates are higher priority.
+- A group already being dispatched is completed so another selection cannot be inserted between its selection and its associated actions.
+- A selection and its following actions form one group. Long groups are chunked to eight packets, with the selection prefix repeated for the next chunk.
+
+### Command priority
+
+Higher priority is assigned to building placement, unit production, morphing, research, upgrades, rally commands, gathering, returning cargo, repair, and relevant production/cancellation packets. Attack and movement intent is lower priority. Waiting commands gain priority with age, so tactical orders can eventually overtake newly arriving economy work rather than being starved indefinitely.
+
+Priority assignment is based on the translated Brood War command opcode and the action field in the translated action packet. This logic has unit tests, but its effect on real matches still needs to be evaluated with replays and bridge logs.
+
+## Tests added
+
+- APM limiter tests cover 300, 500, 1000 and Unlimited, including rolling-window boundaries.
+- Scheduler tests cover build/train/return-cargo/gather/repair/attack priorities, ageing, duplicate handling, selection grouping, and the eight-packet chunk limit.
+- The Windows workflow builds the x86 bridge and runs CTest. The latest workflow result must be checked before distributing a new ZIP.
+
+## Remaining validation
+
+1. Confirm the latest Windows CI build and all CTest cases pass.
+2. Test one offline 1v1 match and one explicitly labelled Battle.net custom Melee match at 500 APM.
+3. Repeat with Unlimited and compare worker mining, mineral float, production uptime, command queue age, and the in-game APM display.
+4. Inspect runtime-v2-multiplayer/bridge.log for SEND, QUEUE EXPIRED, QUEUE COALESCED, QUEUE EVICTED, and QUEUE REJECTED lines.
+5. Validate Top vs Bottom / 1-v-many separately; the underlying model remains a 1v1 model.
+
+## Official upstream references
+
+- Pluto v2.0 release and model files: https://github.com/tscmoo/pluto/releases/tag/v2.0
+- Pluto README: https://github.com/tscmoo/pluto
