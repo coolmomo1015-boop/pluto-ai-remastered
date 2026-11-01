@@ -9,6 +9,7 @@
 #include <string>
 #include "commands.h"
 #include "command_rate_limiter.h"
+#include "command_scheduler.h"
 
 // Compatibility view for the pinned Pluto binary's direct 1.16.1 memory reads.
 // The bot writes only to this view; commands are collected for SCR translation.
@@ -27,6 +28,7 @@ public:
   uint32_t scr_handle(uint16_t legacy_handle) const;
 private:
   static constexpr uint32_t first=0x512000,last=0x6d2000,unit_base=0x59cca8;
+  static constexpr size_t kMaximumPendingTurns=64;
   std::vector<uint8_t> memory;
   std::array<std::array<uint8_t,36>,1700> sprites{};
   std::vector<std::array<uint8_t,112>> bullets;
@@ -39,10 +41,21 @@ private:
   int frame_number=0;
   std::string flush_error;
   unsigned sent=0;
-  struct PendingTurn {int frame;uint64_t not_before_ms;std::vector<Packet> packets;size_t next_packet=0;};
+  struct PendingTurn {
+    int frame;
+    uint64_t queued_at_ms;
+    uint64_t not_before_ms;
+    uint64_t expires_at_ms;
+    unsigned priority;
+    std::vector<Packet> packets;
+    size_t next_packet=0;
+  };
   CommandRateLimiter command_rate_limiter;
   unsigned reaction_delay_ms=0;
   std::vector<PendingTurn> pending_turns;
+  void prune_pending_turns(uint64_t now_ms,FILE* log);
+  void enqueue_turn(int frame,std::vector<Packet> packets,uint64_t now_ms,FILE* log);
+  size_t next_pending_turn(uint64_t now_ms) const;
   uint32_t address(uint32_t old) const;
   uint32_t unit(uint32_t raw) const;
   uint16_t handle_for_raw(uint32_t raw) const;
