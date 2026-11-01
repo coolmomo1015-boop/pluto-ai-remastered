@@ -13,6 +13,19 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Verify that the actual StarCraft top-level window is visible, not merely that
+# the process exists. This guards against the previous hidden-window launcher bug.
+if (-not ('PlutoWindowNative' -as [type])) {
+  Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class PlutoWindowNative {
+  [DllImport("user32.dll")]
+  public static extern bool IsWindowVisible(IntPtr hWnd);
+}
+'@
+}
+
 # Resolve paths only after the script has started. $PSScriptRoot is not reliable
 # in a param() default expression, which caused Split-Path to receive an empty
 # string when launched from the packaged .cmd files.
@@ -137,7 +150,8 @@ try {
           [System.IO.Path]::GetFullPath($candidatePath) -ine [System.IO.Path]::GetFullPath($StarCraft)) {
         continue
       }
-      if ($candidate.MainWindowHandle -ne 0) {
+      if ($candidate.MainWindowHandle -ne 0 -and
+          [PlutoWindowNative]::IsWindowVisible($candidate.MainWindowHandle)) {
         $game = $candidate
         $ready = $true
         break
@@ -150,7 +164,7 @@ try {
     $observed = @(Get-Process -Name $gameProcessName -ErrorAction SilentlyContinue |
       ForEach-Object {
         try { $_.Refresh(); $path = $_.Path } catch { $path = '<path unavailable>' }
-        "PID=$($_.Id), MainWindowHandle=$($_.MainWindowHandle), Path=$path"
+        "PID=$($_.Id), MainWindowHandle=$($_.MainWindowHandle), Visible=$([PlutoWindowNative]::IsWindowVisible($_.MainWindowHandle)), Path=$path"
       })
     $details = if ($observed.Count) { $observed -join '; ' } else { 'No StarCraft process was found.' }
     $startedState = if ($startedGame.HasExited) { "Initial PID $($startedGame.Id) exited with code $($startedGame.ExitCode)." } else { "Initial PID $($startedGame.Id) is still running." }
