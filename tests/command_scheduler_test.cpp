@@ -40,6 +40,16 @@ int main() {
     assert(group.size()<=8);
     assert(is_selection_packet(group.front())); // Selection reapplied for each chunk.
   }
+
+  std::vector<Packet> switched_selection{Packet{0x63,0}};
+  for(unsigned i=0;i<7;++i)switched_selection.push_back(attack);
+  switched_selection.push_back(Packet{0x64,0});
+  switched_selection.push_back(gather);
+  const auto switched_groups=group_command_packets(switched_selection);
+  assert(switched_groups.size()==2);
+  assert(switched_groups[0].size()==8);
+  assert(switched_groups[1].size()==2);
+  assert(switched_groups[1][0][0]==0x64);
   assert(command_turn_ttl_ms(4)==12000);
   assert(command_turn_ttl_ms(2)==5000);
   assert(command_turn_schedule_score(2,0)==2);
