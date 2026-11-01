@@ -5,6 +5,8 @@ int main() {
   assert(command_packet_priority(Packet{0x0c,0,0,0,0,0,0,0})==4); // Build
   assert(command_packet_priority(Packet{0x1f,0,0})==4); // Train
   assert(command_packet_priority(Packet{0x1e,0})==4); // Return cargo
+  assert(command_packet_priority(Packet{0x27})==4); // Carrier/Reaver fighter
+  assert(command_packet_priority(Packet{0x20,0,0})==4); // Cancel train
   assert(command_packet_priority(Packet{0x63,0})==1); // Selection
   assert(command_turn_priority({Packet{0x63,0}})==3); // Standalone selection
   assert(command_packet_priority(Packet{0x60,0})==2); // Right-click/tactical
