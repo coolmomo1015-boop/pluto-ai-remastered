@@ -50,9 +50,14 @@ inline std::vector<std::vector<Packet>> group_command_packets(const std::vector<
   std::vector<std::vector<Packet>> groups;
   std::vector<Packet> selection_prefix;
   std::vector<Packet> selected_group;
+  bool continuation_prefix=false;
   for (const auto& packet:packets) {
     if (is_selection_packet(packet)) {
-      if (selected_group.size()>selection_prefix.size()) {
+      if (continuation_prefix) {
+        selected_group.clear();
+        selection_prefix.clear();
+        continuation_prefix=false;
+      } else if (selected_group.size()>selection_prefix.size()) {
         groups.push_back(std::move(selected_group));
         selected_group.clear();
         selection_prefix.clear();
@@ -61,15 +66,18 @@ inline std::vector<std::vector<Packet>> group_command_packets(const std::vector<
       selected_group.push_back(packet);
     } else if (!selected_group.empty()) {
       selected_group.push_back(packet);
+      continuation_prefix=false;
       if (selected_group.size()>=kMaximumPacketsPerGroup) {
         groups.push_back(std::move(selected_group));
         selected_group=selection_prefix;
+        continuation_prefix=true;
       }
     } else {
       groups.push_back({packet});
     }
   }
-  if (!selected_group.empty())groups.push_back(std::move(selected_group));
+  if (!selected_group.empty() && !continuation_prefix)
+    groups.push_back(std::move(selected_group));
   return groups;
 }
 
