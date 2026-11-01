@@ -18,28 +18,89 @@ void LegacyView::reset() {
   raw_start=raw_length=0;flush_error.clear();sent=0;pending_turns.clear();
   command_rate_limiter.reset();
 }
+void LegacyView::prune_pending_turns(uint64_t now_ms,FILE* log) {
+  for(auto it=pending_turns.begin();it!=pending_turns.end();) {
+    if(it->next_packet==0 && now_ms>=it->expires_at_ms) {
+      std::fprintf(log,"{\\"stage\\":\\"queue_expired\\",\\"frame\\":%d,\\"priority\\":%u,\\"age_ms\\":%llu}\\n",
+        it->frame,it->priority,static_cast<unsigned long long>(now_ms-it->queued_at_ms));
+      it=pending_turns.erase(it);
+    } else ++it;
+  }
+}
+void LegacyView::enqueue_turn(int frame,std::vector<Packet> packets,uint64_t now_ms,FILE* log) {
+  if(packets.empty())return;
+  const unsigned priority=command_turn_priority(packets);
+  const uint64_t ttl=command_turn_ttl_ms(priority);
+
+  if(command_turn_is_replaceable(packets)) {
+    for(auto it=pending_turns.begin();it!=pending_turns.end();) {
+      if(it->next_packet==0 && it->packets==packets) {
+        std::fprintf(log,"{\\"stage\\":\\"queue_coalesced\\",\\"frame\\":%d}\\n",it->frame);
+        it=pending_turns.erase(it);
+      } else ++it;
+    }
+  }
+
+  if(pending_turns.size()>=kMaximumPendingTurns) {
+    auto victim=pending_turns.end();
+    for(auto it=pending_turns.begin();it!=pending_turns.end();++it) {
+      if(it->next_packet!=0)continue;
+      if(victim==pending_turns.end() || it->priority<victim->priority ||
+         (it->priority==victim->priority && it->queued_at_ms<victim->queued_at_ms))
+        victim=it;
+    }
+    if(victim==pending_turns.end() || victim->priority>priority) {
+      std::fprintf(log,"{\\"stage\\":\\"queue_rejected\\",\\"frame\\":%d,\\"priority\\":%u}\\n",frame,priority);
+      return;
+    }
+    std::fprintf(log,"{\\"stage\\":\\"queue_evicted\\",\\"frame\\":%d,\\"priority\\":%u}\\n",
+      victim->frame,victim->priority);
+    pending_turns.erase(victim);
+  }
+
+  pending_turns.push_back({frame,now_ms,now_ms+reaction_delay_ms,now_ms+ttl,priority,std::move(packets),0});
+}
+size_t LegacyView::next_pending_turn(uint64_t now_ms) const {
+  if(pending_turns.empty())return pending_turns.size();
+  // Once a turn starts, finish its unit-selection/action sequence atomically.
+  if(pending_turns.front().next_packet!=0)return 0;
+
+  size_t best=pending_turns.size();
+  unsigned best_score=0;
+  uint64_t best_age=0;
+  for(size_t i=0;i<pending_turns.size();++i) {
+    const auto& turn=pending_turns[i];
+    if(now_ms<turn.not_before_ms)continue;
+    const uint64_t age=now_ms>=turn.queued_at_ms?now_ms-turn.queued_at_ms:0;
+    const unsigned ageing=static_cast<unsigned>(std::min<uint64_t>(4,age/1000));
+    const unsigned score=turn.priority+ageing;
+    if(best==pending_turns.size() || score>best_score ||
+       (score==best_score && age>best_age)) {
+      best=i;best_score=score;best_age=age;
+    }
+  }
+  return best;
+}
 void LegacyView::begin_frame(FILE* log,int frame) {
   current_view=this;frame_log=log;frame_number=frame;sent=0;
+  const auto now=GetTickCount64();
+  prune_pending_turns(now,log);
+  if(pending_turns.empty())return;
+  const auto index=next_pending_turn(now);
+  if(index>=pending_turns.size())return;
+  if(!command_rate_limiter.allow(now))return;
+
+  if(index!=0)std::swap(pending_turns[0],pending_turns[index]);
+  auto& turn=pending_turns.front();
   const auto send=reinterpret_cast<void (__cdecl*)(const uint8_t*,size_t)>(scr::send_command());
-  for(auto turn=pending_turns.begin();turn!=pending_turns.end();) {
-    if(turn->frame>=frame)break;
-    if(turn->next_packet>=turn->packets.size()) {
-      turn=pending_turns.erase(turn);
-      continue;
-    }
-    // Wait for the configured response delay before dispatching this decision.
-    const auto now=GetTickCount64();
-    if(now<turn->not_before_ms)break;
-    if(!command_rate_limiter.allow(now))break;
-    const auto& packet=turn->packets[turn->next_packet++];
-    send(packet.data(),packet.size());++sent;
-    std::fprintf(log,"{\"command_frame\":%d,\"queued_frame\":%d,\"packet_hex\":\"",frame,turn->frame);
-    for(auto b:packet)std::fprintf(log,"%02x",b);
-    std::fprintf(log,"\",\"submitted\":true,\"apm_window\":%u}\n",
-      command_rate_limiter.used_in_window());
-    if(turn->next_packet>=turn->packets.size())pending_turns.erase(turn);
-    break;
-  }
+  const auto& packet=turn.packets[turn.next_packet++];
+  send(packet.data(),packet.size());++sent;
+  std::fprintf(log,"{\\"command_frame\\":%d,\\"queued_frame\\":%d,\\"priority\\":%u,\\"queue_age_ms\\":%llu,\\"packet_hex\\":\\"",
+    frame,turn.frame,turn.priority,static_cast<unsigned long long>(now-turn.queued_at_ms));
+  for(auto b:packet)std::fprintf(log,"%02x",b);
+  std::fprintf(log,"\\",\\"submitted\\":true,\\"apm_window\\":%u,\\"apm_limit\\":%u}\\n",
+    command_rate_limiter.used_in_window(),command_rate_limiter.limit());
+  if(turn.next_packet>=turn.packets.size())pending_turns.erase(pending_turns.begin());
 }
 void __cdecl LegacyView::flush_turn() noexcept {
   if(!current_view)return;
@@ -172,10 +233,9 @@ unsigned LegacyView::drain(FILE*,int frame) {
   if(size>512)throw std::runtime_error("Legacy command queue overflow");
   if(size){
     auto packets=translate_commands(reinterpret_cast<const uint8_t*>(address(0x654880)),size,[this](uint16_t id){return scr_handle(id);});
-    // SCR's offline turn queue applies commands one frame earlier than Pluto's
-    // 1.16.1 training environment. Retain one frame to preserve the measured
-    // four-frame observation-to-effect delay, including selection ordering.
-    pending_turns.push_back({frame,GetTickCount64()+reaction_delay_ms,std::move(packets),0});
+    // Keep each observation's packet sequence intact, while prioritizing
+    // economic work, expiring stale intent and bounding the pending backlog.
+    enqueue_turn(frame,std::move(packets),GetTickCount64(),log);
   }
   put<uint32_t>(address(0x654aa0),0);
   return sent;
