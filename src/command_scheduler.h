@@ -52,14 +52,16 @@ inline std::vector<std::vector<Packet>> group_command_packets(const std::vector<
   std::vector<Packet> selected_group;
   for (const auto& packet:packets) {
     if (is_selection_packet(packet)) {
-      if (!selected_group.empty())groups.push_back(std::move(selected_group));
-      selection_prefix.clear();
+      if (selected_group.size()>selection_prefix.size()) {
+        groups.push_back(std::move(selected_group));
+        selected_group.clear();
+        selection_prefix.clear();
+      }
       selection_prefix.push_back(packet);
-      selected_group=selection_prefix;
+      selected_group.push_back(packet);
     } else if (!selected_group.empty()) {
       selected_group.push_back(packet);
       if (selected_group.size()>=kMaximumPacketsPerGroup) {
-        // Re-emit the selection for the next chunk so it remains independent.
         groups.push_back(std::move(selected_group));
         selected_group=selection_prefix;
       }
