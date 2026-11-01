@@ -43,6 +43,11 @@ inline unsigned command_turn_priority(const std::vector<Packet>& packets) {
   return priority;
 }
 
+inline unsigned command_turn_schedule_score(unsigned priority,uint64_t age_ms) {
+  const unsigned ageing=static_cast<unsigned>(std::min<uint64_t>(4,age_ms/1000));
+  return priority+ageing;
+}
+
 inline uint64_t command_turn_ttl_ms(unsigned priority) {
   if (priority>=4) return 12000;
   if (priority<=2) return 5000;
