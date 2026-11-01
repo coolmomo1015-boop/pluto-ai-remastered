@@ -26,6 +26,8 @@ int main() {
   assert(command_turn_priority({Packet{0x63,0},gather})==4);
   assert(command_turn_ttl_ms(4)==12000);
   assert(command_turn_ttl_ms(2)==5000);
+  assert(command_turn_schedule_score(2,0)==2);
+  assert(command_turn_schedule_score(2,3000)>command_turn_schedule_score(4,0));
   assert(command_turn_is_replaceable({attack}));
   assert(!command_turn_is_replaceable({Packet{0x1f,0,0}}));
   assert(!command_turn_is_replaceable({Packet{0x63,0},Packet{0x0c,0,0}}));
