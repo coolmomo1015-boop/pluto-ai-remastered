@@ -257,7 +257,7 @@ DWORD WINAPI initialize(void*) {
   if(speed_ms>1000)speed_ms=1000;
   log_file=_wfsopen((directory/"bridge.log").c_str(),L"w",_SH_DENYNO);
   if(!log_file)return 1;
-  std::fprintf(log_file,"APM limit: %u packets/minute (0=unlimited)\\n",apm_limit);
+  std::fprintf(log_file,"APM limit: %u packets/minute (0=unlimited)\n",apm_limit);
 
   std::fprintf(log_file,"{\"stage\":\"initializing\",\"pid\":%lu,\"mode\":\"%s\",\"challenge\":%s}\n",GetCurrentProcessId(),
     challenge_mode?"challenge_experimental":(allow_multiplayer?"multiplayer_experimental":"offline_pluto"),challenge_mode?"true":"false");std::fflush(log_file);
