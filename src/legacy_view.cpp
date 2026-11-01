@@ -227,7 +227,7 @@ void LegacyView::bind(HMODULE pluto) {
   }
   FlushInstructionCache(GetCurrentProcess(),nullptr,0);
 }
-unsigned LegacyView::drain(FILE*,int frame) {
+unsigned LegacyView::drain(FILE* log,int frame) {
   if(!flush_error.empty())throw std::runtime_error(flush_error);
   const auto size=scr::read<uint32_t>(address(0x654aa0));
   if(size>512)throw std::runtime_error("Legacy command queue overflow");
