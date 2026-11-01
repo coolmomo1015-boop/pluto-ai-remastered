@@ -36,6 +36,34 @@ inline unsigned command_packet_priority(const Packet& packet) {
   }
 }
 
+inline bool is_selection_packet(const Packet& packet) {
+  return !packet.empty() &&
+    (packet[0]==0x63 || packet[0]==0x64 || packet[0]==0x65);
+}
+
+// Keep a selection packet and the actions that use that selection together.
+// Independent commands become their own schedulable turns, so a long mixed
+// frame cannot make every command inherit the same priority and wait time.
+inline std::vector<std::vector<Packet>> group_command_packets(const std::vector<Packet>& packets) {
+  std::vector<std::vector<Packet>> groups;
+  std::vector<Packet> selected_group;
+  for (const auto& packet:packets) {
+    if (is_selection_packet(packet)) {
+      if (!selected_group.empty()) {
+        groups.push_back(std::move(selected_group));
+        selected_group.clear();
+      }
+      selected_group.push_back(packet);
+    } else if (!selected_group.empty()) {
+      selected_group.push_back(packet);
+    } else {
+      groups.push_back({packet});
+    }
+  }
+  if (!selected_group.empty())groups.push_back(std::move(selected_group));
+  return groups;
+}
+
 inline unsigned command_turn_priority(const std::vector<Packet>& packets) {
   unsigned priority=1;
   for (const auto& packet:packets)
