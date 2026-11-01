@@ -46,17 +46,23 @@ inline bool is_selection_packet(const Packet& packet) {
 // Independent commands become their own schedulable turns, so a long mixed
 // frame cannot make every command inherit the same priority and wait time.
 inline std::vector<std::vector<Packet>> group_command_packets(const std::vector<Packet>& packets) {
+  constexpr size_t kMaximumPacketsPerGroup=8;
   std::vector<std::vector<Packet>> groups;
+  std::vector<Packet> selection_prefix;
   std::vector<Packet> selected_group;
   for (const auto& packet:packets) {
     if (is_selection_packet(packet)) {
-      if (!selected_group.empty()) {
-        groups.push_back(std::move(selected_group));
-        selected_group.clear();
-      }
-      selected_group.push_back(packet);
+      if (!selected_group.empty())groups.push_back(std::move(selected_group));
+      selection_prefix.clear();
+      selection_prefix.push_back(packet);
+      selected_group=selection_prefix;
     } else if (!selected_group.empty()) {
       selected_group.push_back(packet);
+      if (selected_group.size()>=kMaximumPacketsPerGroup) {
+        // Re-emit the selection for the next chunk so it remains independent.
+        groups.push_back(std::move(selected_group));
+        selected_group=selection_prefix;
+      }
     } else {
       groups.push_back({packet});
     }
