@@ -24,6 +24,13 @@ int main() {
   assert(command_packet_priority(attack)==2);
 
   assert(command_turn_priority({Packet{0x63,0},gather})==4);
+  const auto groups=group_command_packets({
+    Packet{0x63,0},attack,gather,Packet{0x64,0},Packet{0x1f,0,0},Packet{0x60,0}
+  });
+  assert(groups.size()==3);
+  assert(groups[0].size()==3); // Selection plus its following orders.
+  assert(groups[1].size()==2); // Next selection plus production command.
+  assert(groups[2].size()==1); // Independent tactical command.
   assert(command_turn_ttl_ms(4)==12000);
   assert(command_turn_ttl_ms(2)==5000);
   assert(command_turn_schedule_score(2,0)==2);
