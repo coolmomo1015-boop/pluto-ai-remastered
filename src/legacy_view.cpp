@@ -27,9 +27,9 @@ void LegacyView::begin_frame(FILE* log,int frame) {
       turn=pending_turns.erase(turn);
       continue;
     }
-    // A transparent gameplay limiter: at most 400 translated command packets
-    // in any rolling 60-second window, paced by a 150 ms minimum interval.
+    // Wait for the configured response delay before dispatching this decision.
     const auto now=GetTickCount64();
+    if(now<turn->not_before_ms)break;
     if(!command_rate_limiter.allow(now))break;
     const auto& packet=turn->packets[turn->next_packet++];
     send(packet.data(),packet.size());++sent;
@@ -175,7 +175,7 @@ unsigned LegacyView::drain(FILE*,int frame) {
     // SCR's offline turn queue applies commands one frame earlier than Pluto's
     // 1.16.1 training environment. Retain one frame to preserve the measured
     // four-frame observation-to-effect delay, including selection ordering.
-    pending_turns.push_back({frame,std::move(packets),0});
+    pending_turns.push_back({frame,GetTickCount64()+reaction_delay_ms,std::move(packets),0});
   }
   put<uint32_t>(address(0x654aa0),0);
   return sent;
