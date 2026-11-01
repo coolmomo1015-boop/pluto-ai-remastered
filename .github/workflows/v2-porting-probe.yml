@@ -121,6 +121,28 @@ jobs:
           if (-not $launcherSource.Contains('Get-Process -Name $gameProcessName')) {
             throw 'The launcher must locate the visible StarCraft process after startup.'
           }
+          if (-not $launcherSource.Contains('PlutoWindowNative]::IsWindowVisible')) {
+            throw 'The launcher must reject hidden StarCraft windows.'
+          }
+          if (-not $launcherSource.Contains('Start-Process -FilePath $StarCraft -ArgumentList')) {
+            throw 'The launcher must start the configured StarCraft executable directly.'
+          }
+          if (-not $launcherSource.Contains('scr-loader.exe')) {
+            throw 'The launcher must attach the bridge loader after window detection.'
+          }
+          foreach ($launcher in @('out/Start Pluto V2.cmd','out/Start Pluto V2 Multiplayer.cmd','out/Start Pluto V2 Challenge.cmd')) {
+            if (-not (Test-Path -LiteralPath $launcher -PathType Leaf)) {
+              throw "Packaged launcher is missing: $launcher"
+            }
+            $launcherText = Get-Content -LiteralPath $launcher -Raw
+            if (-not $launcherText.Contains('ChooseAPM') -or
+                -not $launcherText.Contains('APM=0') -or
+                -not $launcherText.Contains('APM=300') -or
+                -not $launcherText.Contains('APM=500') -or
+                -not $launcherText.Contains('APM=1000')) {
+              throw "Packaged launcher has an incomplete APM menu: $launcher"
+            }
+          }
           & 'out/scripts/start-pluto-v2.ps1' -PackageCheck
           $packageCheckSucceeded = $?
           if (-not $packageCheckSucceeded) { throw 'Packaged path validation failed.' }
