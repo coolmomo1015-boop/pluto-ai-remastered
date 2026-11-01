@@ -38,6 +38,7 @@ bool challenge_mode=false;
 unsigned submitted_packets=0;
 DWORD game_thread=0;
 int speed_ms=0;
+unsigned apm_limit=500;
 std::array<uint32_t,7> saved_speed{},saved_alt_speed{};
 thread_local bool in_callback=false;
 
@@ -106,6 +107,7 @@ void load_bot() {
   init(api_game.get());bot=create();
   if(!bot)throw std::runtime_error("Pluto returned null");
   std::fprintf(log_file,"{\"stage\":\"bot_on_start_begin\"}\n");std::fflush(log_file);
+  legacy->set_apm_limit(apm_limit);
   legacy->begin_frame(log_file,0);bot->onStart();
   set_speed(speed_ms);
   std::fprintf(log_file,"{\"stage\":\"bot_on_start_complete\"}\n");std::fflush(log_file);
@@ -250,9 +252,13 @@ DWORD WINAPI initialize(void*) {
   speed_ms=GetPrivateProfileIntW(L"pluto",L"speed_ms",0,(directory/L"bridge.ini").c_str());
   allow_multiplayer=GetPrivateProfileIntW(L"pluto",L"multiplayer",0,(directory/L"bridge.ini").c_str())==1;
   challenge_mode=GetPrivateProfileIntW(L"pluto",L"challenge",0,(directory/L"bridge.ini").c_str())==1;
+  apm_limit=static_cast<unsigned>(GetPrivateProfileIntW(L"pluto",L"apm",500,(directory/L"bridge.ini").c_str()));
+  if(apm_limit!=0 && apm_limit!=300 && apm_limit!=500 && apm_limit!=1000)apm_limit=500;
   if(speed_ms>1000)speed_ms=1000;
   log_file=_wfsopen((directory/"bridge.log").c_str(),L"w",_SH_DENYNO);
   if(!log_file)return 1;
+  std::fprintf(log_file,"APM limit: %u packets/minute (0=unlimited)\\n",apm_limit);
+
   std::fprintf(log_file,"{\"stage\":\"initializing\",\"pid\":%lu,\"mode\":\"%s\",\"challenge\":%s}\n",GetCurrentProcessId(),
     challenge_mode?"challenge_experimental":(allow_multiplayer?"multiplayer_experimental":"offline_pluto"),challenge_mode?"true":"false");std::fflush(log_file);
   try {
