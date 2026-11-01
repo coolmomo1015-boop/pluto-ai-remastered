@@ -3,6 +3,7 @@ param(
   [string]$StarCraft = '',
   [string]$Pluto = '',
   [ValidateRange(-1,1000)][int]$SpeedMs = 0,
+  [ValidateSet(0, 300, 500, 1000)][int]$APM = 500,
   [switch]$DrawGraph,
   [switch]$Multiplayer,
   [switch]$Challenge,
@@ -97,7 +98,7 @@ if ($previousLogs) {
   foreach ($path in $previousLogs) { Move-Item -LiteralPath $path -Destination $archive }
 }
 Copy-Item -LiteralPath (Join-Path $bin 'pluto-scr.dll') -Destination $runtime -Force
-@('[pluto]',"module=$Pluto","speed_ms=$SpeedMs","multiplayer=$([int]$Multiplayer.IsPresent)","challenge=$([int]$Challenge.IsPresent)",'apm_limit=400') | Set-Content -LiteralPath (Join-Path $runtime 'bridge.ini') -Encoding Unicode
+@('[pluto]',"module=$Pluto","speed_ms=$SpeedMs","multiplayer=$([int]$Multiplayer.IsPresent)","challenge=$([int]$Challenge.IsPresent)","apm=$APM") | Set-Content -LiteralPath (Join-Path $runtime 'bridge.ini') -Encoding Unicode
 $previousDraw = $env:BWRL_DRAW
 $previousStraddle = $env:BWRL_STRADDLE
 $previousBudget = $env:BWRL_FRAME_BUDGET_MS
@@ -174,7 +175,8 @@ try {
     Write-Output "Pluto v2.0 ready in StarCraft process $($game.Id). Choose Single Player > Play Custom, Melee, one Computer opponent."
   }
   Write-Output "Logs and persistent opening statistics: $runtime"
-  Write-Output "Transparent command limiter: 400 packets/minute (approximate APM). This is a gameplay limit, not an anti-cheat bypass."
+  $apmLabel = if ($APM -eq 0) { 'Unlimited' } else { "$APM packets/minute maximum" }
+  Write-Output "Command limit: $apmLabel (approximate APM; 0 means no bridge cap). This is a gameplay setting, not an anti-cheat bypass."
 } catch {
   # The initial launch and any Battle.net handoff process belong to this launch,
   # because the script rejects pre-existing StarCraft instances above.
