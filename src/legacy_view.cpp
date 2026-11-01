@@ -29,7 +29,22 @@ void LegacyView::prune_pending_turns(uint64_t now_ms,FILE* log) {
 }
 void LegacyView::enqueue_turn(int frame,std::vector<Packet> packets,uint64_t now_ms,FILE* log) {
   if(packets.empty())return;
-  const unsigned priority=command_turn_priority(packets);
+  const unsigned priority=command_turn_priority(packets,[this](const Packet& packet) {
+    uint16_t target_type=0;
+    if(packet.size()>=9 && packet[0]==0x60) {
+      const uint32_t id=uint32_t(packet[5]) |
+        (uint32_t(packet[6])<<8) | (uint32_t(packet[7])<<16) |
+        (uint32_t(packet[8])<<24);
+      const unsigned shift=raw_length>1700?13:11;
+      const uint32_t index=id&(raw_length>1700?0x1fff:0x7ff);
+      if(index && index<=raw_length) {
+        const auto raw=raw_start+(index-1)*336;
+        if(scr::read<uint8_t>(raw+165)==(id>>shift))
+          target_type=scr::read<uint16_t>(raw+100);
+      }
+    }
+    return command_packet_priority(packet,target_type);
+  });
   const uint64_t ttl=command_turn_ttl_ms(priority);
 
   if(command_turn_is_replaceable(packets)) {
