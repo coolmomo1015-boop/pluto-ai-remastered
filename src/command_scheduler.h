@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <vector>
+#include <utility>
 
 // Higher base priority values are scheduled first. Ageing prevents starvation.
 inline unsigned command_packet_priority(const Packet& packet) {
@@ -20,7 +21,7 @@ inline unsigned command_packet_priority(const Packet& packet) {
     case 0x35: // Zerg building morph
       return 4;
     case 0x61: // Action packet (translated from legacy 0x15)
-      if (packet.size() >= 12) {
+      if (packet.size() >= 13) {
         const auto action=packet[11];
         // BWAPI UnitCommandTypes: build, addon, train, morph, research,
         // upgrade, rally, gather, return cargo and repair.
