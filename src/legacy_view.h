@@ -20,6 +20,8 @@ public:
   void reset();
   void begin_frame(FILE* log,int frame);
   void discard_pending_turns(){pending_turns.clear();}
+  void set_apm_limit(unsigned apm){command_rate_limiter.set_limit(apm);}
+  void set_reaction_delay(unsigned milliseconds){reaction_delay_ms=milliseconds;}
   unsigned drain(FILE* log,int frame);
   static void __cdecl flush_turn() noexcept;
   uint32_t scr_handle(uint16_t legacy_handle) const;
@@ -37,8 +39,9 @@ private:
   int frame_number=0;
   std::string flush_error;
   unsigned sent=0;
-  struct PendingTurn {int frame;std::vector<Packet> packets;size_t next_packet=0;};
+  struct PendingTurn {int frame;uint64_t not_before_ms;std::vector<Packet> packets;size_t next_packet=0;};
   CommandRateLimiter command_rate_limiter;
+  unsigned reaction_delay_ms=0;
   std::vector<PendingTurn> pending_turns;
   uint32_t address(uint32_t old) const;
   uint32_t unit(uint32_t raw) const;
