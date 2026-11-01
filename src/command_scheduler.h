@@ -27,21 +27,30 @@ inline unsigned command_packet_priority(const Packet& packet) {
     case 0x34: // Cancel addon
     case 0x35: // Zerg building morph
       return 4;
-    case 0x61: // Action packet (translated from legacy 0x15)
-      if (packet.size() >= 13) {
-        const auto action=packet[11];
-        // BWAPI UnitCommandTypes: build, addon, train, morph, research,
-        // upgrade, rally, gather, return cargo and repair.
-        if ((action>=2 && action<=9) || (action>=15 && action<=17)) return 4;
-        if (action<=14) return 2; // attack, move, patrol, hold and tactical orders
-      }
+    case 0x61:
+      // The legacy 0x15 "selected units action" packet contains opaque fields,
+      // not a documented BWAPI UnitCommandType. Do not infer Gather/Repair from
+      // arbitrary coordinate/order bytes.
       return 3;
-    case 0x60: return 2; // Right-click / movement intent
+    case 0x60: return 2; // Move/right-click; resource targets are classified below
     case 0x63: // Select units
     case 0x64: // Add selection
     case 0x65: return 1; // Remove selection
     default: return 3;
   }
+}
+
+inline bool is_resource_target_unit_type(uint16_t unit_type) {
+  // BWAPI UnitTypes: Mineral Field 176-178, Vespene Geyser 188,
+  // Terran Refinery 110, Zerg Extractor 149, Protoss Assimilator 157.
+  return (unit_type>=176 && unit_type<=178) ||
+    unit_type==188 || unit_type==110 || unit_type==149 || unit_type==157;
+}
+
+inline unsigned command_packet_priority(const Packet& packet,uint16_t target_unit_type) {
+  if (!packet.empty() && packet[0]==0x60 &&
+      is_resource_target_unit_type(target_unit_type)) return 4;
+  return command_packet_priority(packet);
 }
 
 inline bool is_selection_packet(const Packet& packet) {
@@ -88,14 +97,21 @@ inline std::vector<std::vector<Packet>> group_command_packets(const std::vector<
   return groups;
 }
 
-inline unsigned command_turn_priority(const std::vector<Packet>& packets) {
+template<class Classifier>
+inline unsigned command_turn_priority(const std::vector<Packet>& packets,Classifier classifier) {
   unsigned priority=1;
   for (const auto& packet:packets)
-    priority=std::max(priority,command_packet_priority(packet));
+    priority=std::max(priority,classifier(packet));
   // A selection-only turn is a precondition for commands that may follow in
   // the next observation, so do not leave it behind combat traffic.
   if(priority==1)return 3;
   return priority;
+}
+
+inline unsigned command_turn_priority(const std::vector<Packet>& packets) {
+  return command_turn_priority(packets,[](const Packet& packet){
+    return command_packet_priority(packet);
+  });
 }
 
 inline unsigned command_turn_schedule_score(unsigned priority,uint64_t age_ms) {
