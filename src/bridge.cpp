@@ -30,6 +30,9 @@ BWAPI::AIModule* bot;
 wchar_t bot_path[32768]{};
 int last_frame=-1;
 bool failed=false;
+// Frame observed at the verified game hook and frame where an SEH failure occurred.
+int last_hook_frame=-1;
+int failed_at_frame=-1;
 bool match_ended=false;
 bool speed_changed=false;
 bool unsupported_session_reported=false;
@@ -225,6 +228,7 @@ void guarded_frame_cpp(bool frame) {
 }
 LONG diagnose(EXCEPTION_POINTERS* p) {
   failed=true;
+  failed_at_frame=last_hook_frame;
   restore_speed();
   std::fprintf(log_file,"{\"failure\":\"bridge_exception\",\"code\":%lu,\"address\":\"%p\",\"pluto_rva\":%lu,\"access\":%lu,\"target\":\"%08lx\"}\n",p->ExceptionRecord->ExceptionCode,p->ExceptionRecord->ExceptionAddress,p->ContextRecord->Eip-reinterpret_cast<DWORD>(bot_module),p->ExceptionRecord->ExceptionInformation[0],p->ExceptionRecord->ExceptionInformation[1]);
   std::fflush(log_file);return EXCEPTION_EXECUTE_HANDLER;
@@ -238,6 +242,22 @@ DWORD WINAPI tick_hook() {
   // Verified call sites in step_game_logic: before its first frame and after each
   // completed simulation frame. Restrict interception to those two callers.
   const bool frame=caller==scr::addr(0x76e02f) || caller==scr::addr(0x77d112);
+  // Keep observing the game counter even while the exception latch is set.
+  // A rollover is evidence that a new match started in the same SCR process.
+  if(frame) {
+    const auto g=scr::game();
+    if(g && scr::local_player_id()<8)
+      last_hook_frame=static_cast<int>(scr::read<uint32_t>(g+332));
+  }
+  if(frame && failed && failed_at_frame>=0 && last_hook_frame>=0 &&
+     last_hook_frame<failed_at_frame) {
+    failed=false;
+    std::fprintf(log_file,
+      "{\"stage\":\"bridge_recovery\",\"reason\":\"match_frame_rollover\",\"failed_at_frame\":%d,\"new_frame\":%d}\\n",
+      failed_at_frame,last_hook_frame);
+    std::fflush(log_file);
+    failed_at_frame=-1;
+  }
   if(!failed && !in_callback && (frame || (game_thread && game_thread==GetCurrentThreadId()))) {
     if(frame)game_thread=GetCurrentThreadId();
     in_callback=true;guarded_frame(frame);in_callback=false;
