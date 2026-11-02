@@ -253,7 +253,7 @@ DWORD WINAPI tick_hook() {
      last_hook_frame<failed_at_frame) {
     failed=false;
     std::fprintf(log_file,
-      "{\"stage\":\"bridge_recovery\",\"reason\":\"match_frame_rollover\",\"failed_at_frame\":%d,\"new_frame\":%d}\\n",
+      "{\"stage\":\"bridge_recovery\",\"reason\":\"match_frame_rollover\",\"failed_at_frame\":%d,\"new_frame\":%d}\n",
       failed_at_frame,last_hook_frame);
     std::fflush(log_file);
     failed_at_frame=-1;
